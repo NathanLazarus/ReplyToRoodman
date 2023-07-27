@@ -38,13 +38,13 @@ foreach data_source in FullFour HarvardLibrary {
 	recode years_schooling_base (1 2 3 = 0) (4 5 6 = 6) (7 8 9 10 = 9) (11 12 13 = 12) (14 = 16)
 	generate years_schooling_add = attempted_years - 1 if attempted_years >= 1
 	replace years_schooling_add = 0 if attempted_years == 0
-	recode years_schooling_add (7 = 6) if inrange(school_attempted, 1, 3)
-	recode years_schooling_add (7 = 3) if inrange(school_attempted, 4, 10) | school_attempted == 12 | school_attempted == 13
-	recode years_schooling_add (7 = 1) if school_attempted == 11
-	recode years_schooling_add (5 6 = 0) if school_attempted == 14
-	recode years_schooling_add (7 = 2) if school_attempted == 14
+	replace years_schooling_add = 6 if inrange(school_attempted, 1, 3) & attempted_years == 8
+	replace years_schooling_add = 3 if (inrange(school_attempted, 4, 10) | school_attempted == 12 | school_attempted == 13) & attempted_years == 8
+	replace years_schooling_add = 1 if school_attempted == 11 & attempted_years == 8
+	replace years_schooling_add = 0 if school_attempted == 14 & (attempted_years == 6 | attempted_years == 7)
+	replace years_schooling_add = 2 if school_attempted == 14 & attempted_years == 8
 	generate years_schooling_correct = years_schooling_base + years_schooling_add
-
+	
 	drop years_schooling_base years_schooling_add
 
 	* This is how Roodman calculates it in his original code
