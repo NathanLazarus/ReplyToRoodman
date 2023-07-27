@@ -77,7 +77,7 @@ foreach data_source in FullFour HarvardLibrary {
 
 	keep if 24>=age74 & age74>=2
 
-	save "CleanData/CompareToRoodmanPreppedData_`data_source'.dta"
+	save "CleanData/CompareToRoodmanPreppedData_`data_source'.dta", replace
 
 }
 
