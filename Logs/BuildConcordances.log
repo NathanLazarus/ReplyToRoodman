@@ -1,0 +1,54 @@
+------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/BuildConcordances.log
+  log type:  text
+ opened on:  27 Jul 2023, 18:25:39
+
+. 
+. import delim "Concordances/concordance_hsiao.csv", clear
+(encoding automatically selected: ISO-8859-9)
+(3 vars, 548 obs)
+
+. rename birthpl_susenas birthpl_SUSENAS
+
+. save "Concordances/concordance_hsiao.dta", replace
+file Concordances/concordance_hsiao.dta saved
+
+. 
+. import delim "RawData/hsiao_inpres.csv", clear
+(encoding automatically selected: ISO-8859-9)
+(6 vars, 282 obs)
+
+. rename prop71 prop_birth71
+
+. rename kab71 kab_birth71
+
+. merge m:1 kab_birth71 using "Concordances/birth_districts.dta"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                               282  (_merge==3)
+    -----------------------------------------
+
+. drop _merge
+
+. save "RawData/hsiao_inpres_with_numeric_birthpl.dta", replace
+file RawData/hsiao_inpres_with_numeric_birthpl.dta saved
+
+. 
+. 
+. import delim "Concordances/SUPAS 1995-2010 regency concordance.csv", clear
+(encoding automatically selected: ISO-8859-1)
+(3 vars, 498 obs)
+
+. save "Concordances/SUPAS 1995-2010 regency concordance.dta", replace
+file Concordances/SUPAS 1995-2010 regency concordance.dta saved
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/BuildConcordances.log
+  log type:  text
+ closed on:  27 Jul 2023, 18:25:39
+------------------------------------------------------------------------------------------------------------------

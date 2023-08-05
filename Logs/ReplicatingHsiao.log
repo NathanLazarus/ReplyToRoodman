@@ -1,0 +1,542 @@
+------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/ReplicatingHsiao.log
+  log type:  text
+ opened on:  27 Jul 2023, 18:28:00
+
+. 
+. 
+. 
+. local regencies = "Hsiao"
+
+. local survey_year_FEs = "True"
+
+. local omitSelfEmployed = "True"
+
+. local years = "2011,2012,2013,2014"
+
+. local inflation = "Hsiao"
+
+. local regency_vars = "Hsiao"
+
+. local specification = "Hsiao"
+
+. local heads_of_household_only = "True"
+
+. local restrict_to_employed = "True"
+
+. local data_source = "Hsiao" // "Hsiao", "Harvard", or "Ours"
+
+. local restrict_to_employed = "True" // "False" or "True"
+
+. 
+. 
+. if "`data_source'" == "Hsiao" {
+. 
+.         if "`regencies'" == "Hsiao" {
+.                 use "RawData/susenas_HsiaoSent.dta", clear
+.                 merge m:1 kab_birth71 using "Concordances/birth_districts.dta", nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           457,075  
+    -----------------------------------------
+.                 gen birthpl_imputation_wt = 1
+.                 rename income_month B5R29
+.                 rename years_school yeduc
+.                 rename age_1974 age74
+.                 rename hoh relate
+.                 gen birthyr = 1974 - age74
+.                 gen int dum = cond(birthyr<1962, 1900+100, birthyr)
+.                 gen young = 1 if inrange(age74, 2, 6)
+(325,849 missing values generated)
+.                 replace young = 0 if inrange(age74, 12, 17)
+(117,085 real changes made)
+.                 gen birthplnew = birthpl
+.         }
+. 
+. }
+
+. 
+. if "`data_source'" == "Harvard" {
+.         use "RawData/susenas_HarvardLibrary.dta", clear
+.         keep if JK == 1
+.         rename survey_year year
+. 
+.         gen birthpl_SUSENAS = 100 * B5_TL1 + B5_TL2
+. 
+.         merge m:1 birthpl_SUSENAS using "Concordances/concordance_hsiao.dta", nogen
+.         gen birthpl_imputation_wt = 1
+.         drop birthpl
+.         rename birthpl_hsiao birthpl
+. 
+. 
+.         gen age74 = UMUR + 1974 - year
+.         gen birthyr = 1974 - age74
+.         gen int dum = cond(birthyr<1962, 1900+100, birthyr)
+.         gen young = 1 if inrange(age74, 2, 6)
+.         replace young = 0 if inrange(age74, 12, 17)
+.         gen birthplnew = birthpl
+.         rename HB relate
+. 
+. 
+. //      rename B5R17 educ_attain
+. //      gen years_school = 0 if educ_attain == 1
+. //      replace years_school = 6 if educ_attain == 2
+. //      replace years_school = 6 if educ_attain == 3
+. //      replace years_school = 6 if educ_attain == 4
+. //      replace years_school = 9 if educ_attain == 5
+. //      replace years_school = 9 if educ_attain == 6
+. //      replace years_school = 9 if educ_attain == 7
+. //      replace years_school = 12 if educ_attain == 8
+. //      replace years_school = 12 if educ_attain == 9
+. //      replace years_school = 12 if educ_attain == 10
+. //      replace years_school = 12 if educ_attain == 11
+. //      replace years_school = 14 if educ_attain == 12
+. //      replace years_school = 15 if educ_attain == 13
+. //      replace years_school = 16 if educ_attain == 14
+. //      replace years_school = 18 if educ_attain == 15
+. //      
+. //      rename years_school yeduc
+. 
+.         * If we'd rather do things Hsiao's way, comment out the above section and uncomment this.
+.         rename B5R17 highest_diploma
+.         generate years_schooling = highest_diploma
+.         recode years_schooling (1 = 0) (2 3 4 = 6) (5 6 7 = 9) (8 9 10 11 = 12) (12 = 14) (13 = 15) (14 = 16) (1
+> 5 = 18)
+. 
+.         rename years_schooling yeduc
+. 
+.         gen employed = B5R24B
+.         recode employed (1=1) (2 3 4=0)
+.         gen self_employed = B5R31
+.         recode self_employed (1 2 3=1) (4 5 6=0)
+. 
+.         replace self_employed = 0 if employed == 0
+.         replace self_employed = . if employed == .
+. //      replace employed = . if self_employed == . & year == 2012 // only 1
+. //      assert self_employed == 0 if employed == 0
+. //      assert self_employed != . if employed == 1
+. //      assert self_employed == . if employed == .
+. 
+. 
+.         replace B5R29 = . if employed != 1
+. 
+. 
+. }
+
+. 
+. if "`data_source'" == "ours" {
+.         use "CleanData/CompareToRoodmanPreppedData_FullFour.dta", clear
+.         gen yeduc = years_schooling_Hsiao
+.         keep if year < 2014
+.         keep if birthpl_imputation_wt > 0.5
+. 
+.         merge m:1 birthpl_SUSENAS using "Concordances/concordance_hsiao.dta", nogen
+.         cap drop birthpl_imputation_wt
+.         gen birthpl_imputation_wt = 1
+.         drop birthpl
+.         rename birthpl_hsiao birthpl
+.         
+.         gen birthplnew = birthpl
+. }
+
+. 
+. keep if year < 2014 // This way we can compare with our data which has 4 quarters of 2014 instead of 2.
+(63,906 observations deleted)
+
+. 
+.         
+. if "`regency_vars'" == "Hsiao" {
+.         merge m:1 birthpl using "RawData/hsiao_inpres_with_numeric_birthpl.dta"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           393,169  (_merge==3)
+    -----------------------------------------
+.         gen ninnew = nin
+.         gen ch71new = ch71
+.         gen en71new = en71
+. }
+
+. 
+. 
+. gen lwage = ln(B5R29)
+(146,281 missing values generated)
+
+. 
+. 
+. 
+. 
+. 
+. 
+. 
+. if "`survey_year_FEs'" == "True" {
+.         local survey_year_FE_expression = "i.year"
+. }
+
+. else if "`survey_year_FEs'" == "False" {
+.         local survey_year_FE_expression = ""
+. }
+
+. else {
+.         di as error "argument: survey_year_FEs not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`omitSelfEmployed'" == "True" {
+.         local self_employed_restriction = "& self_employed == 0"
+. }
+
+. else if "`omitSelfEmployed'" == "False" {
+.         local self_employed_restriction = ""
+. }
+
+. else {
+.         di as error "argument: omitSelfEmployed not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`restrict_to_employed'" == "True" {
+.         local employed_restriction = "& employed == 1"
+. }
+
+. else if "`restrict_to_employed'" == "False" {
+.         local employed_restriction = ""
+. }
+
+. else {
+.         di as error "argument: restrict_to_employed not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`specification'" == "Hsiao" {
+.         local additional_controls = "1.young#c.ch71new 1.young#c.en71new 1.young#c.wsppc"
+.         local additional_controls_manyIV = "_IbirXch7* _IbirXen7* _IbirXwsp*"
+. }
+
+. else if "`specification'" == "ours_and_Roodman" {
+.         local additional_controls = "_IbirXch7*"
+.         local additional_controls_manyIV = "_IbirXch7*"
+. }
+
+. else {
+.         di as error "argument: specification not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`heads_of_household_only'" == "True" {
+.         local hoh_restriction = "& relate == 1"
+. }
+
+. else if "`heads_of_household_only'" == "False" {
+.         local hoh_restriction = ""
+. }
+
+. else {
+.         di as error "argument: heads_of_household_only not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`regencies'" == "Roodman" | "`regencies'" == "ours_with_imputation_weights" | "`regencies'" == "Hsiao" {
+.         local birthpl_imputation_wt_restrict = ""
+. }
+
+. else if "`regencies'" == "ours" {
+.         local birthpl_imputation_wt_restrict = "& birthpl_imputation_wt > 0.5"
+. }
+
+. else {
+.         di as error "argument: regencies not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. if "`restrict_to_employed'" == "True" {
+.         local employed_restriction = "& employed == 1"
+. }
+
+. else if "`restrict_to_employed'" == "False" {
+.         local employed_restriction = ""
+. }
+
+. else {
+.         di as error "argument: restrict_to_employed not correctly specified"
+.         exit
+. }
+
+. 
+. 
+. xi i.young|ninnew /*i.dum|ninnew*/ i.birthyr // *ch71new i.birthyr*en71new i.birthyr*wsppc i.year i.young|ch71ne
+> w i.young|en71new  i.young|wsppc
+i.young           _Iyoung_0-1         (naturally coded; _Iyoung_0 omitted)
+i.young|ninnew    _IyouXninne_#       (coded as above)
+i.birthyr         _Ibirthyr_1950-1972 (naturally coded; _Ibirthyr_1950 omitted)
+
+. 
+.         
+. // Years of education (all)
+. di "reghdfe yeduc _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' if !missing(yeduc)
+>  `hoh_restriction' `birthpl_imputation_wt_restrict', cluster(birthplnew) absorb(birthplnew)"
+reghdfe yeduc _IyouXninne_1 _Ibirthyr_* 1.young#c.ch71new 1.young#c.en71new 1.young#c.wsppc i.year if !missing(yed
+> uc) & relate == 1 , cluster(birthplnew) absorb(birthplnew)
+
+. reghdfe yeduc _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' if !missing(yeduc) `ho
+> h_restriction' `birthpl_imputation_wt_restrict', cluster(birthplnew) absorb(birthplnew)
+(MWFE estimator converged in 1 iterations)
+note: _Ibirthyr_1951 omitted because of collinearity
+note: _Ibirthyr_1952 omitted because of collinearity
+note: _Ibirthyr_1953 omitted because of collinearity
+note: _Ibirthyr_1954 omitted because of collinearity
+note: _Ibirthyr_1955 omitted because of collinearity
+note: _Ibirthyr_1956 omitted because of collinearity
+note: _Ibirthyr_1963 omitted because of collinearity
+note: _Ibirthyr_1964 omitted because of collinearity
+note: _Ibirthyr_1965 omitted because of collinearity
+note: _Ibirthyr_1966 omitted because of collinearity
+note: _Ibirthyr_1967 omitted because of collinearity
+note: _Ibirthyr_1972 omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =    200,473
+Absorbing 1 HDFE group                            F(  16,    276) =     167.53
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1096
+                                                  Adj R-squared   =     0.1083
+                                                  Within R-sq.    =     0.0398
+Number of clusters (birthplnew) =        277      Root MSE        =     4.5429
+
+                              (Std. err. adjusted for 277 clusters in birthplnew)
+---------------------------------------------------------------------------------
+                |               Robust
+          yeduc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+  _IyouXninne_1 |   .1113038   .0434867     2.56   0.011      .025696    .1969115
+ _Ibirthyr_1951 |          0  (omitted)
+ _Ibirthyr_1952 |          0  (omitted)
+ _Ibirthyr_1953 |          0  (omitted)
+ _Ibirthyr_1954 |          0  (omitted)
+ _Ibirthyr_1955 |          0  (omitted)
+ _Ibirthyr_1956 |          0  (omitted)
+ _Ibirthyr_1957 |  -2.227039   .2429818    -9.17   0.000    -2.705372   -1.748706
+ _Ibirthyr_1958 |  -2.103179   .2418242    -8.70   0.000    -2.579234   -1.627125
+ _Ibirthyr_1959 |   -1.94912   .2427901    -8.03   0.000    -2.427076   -1.471165
+ _Ibirthyr_1960 |  -1.822184   .2428319    -7.50   0.000    -2.300222   -1.344146
+ _Ibirthyr_1961 |  -1.813941   .2362187    -7.68   0.000    -2.278961   -1.348922
+ _Ibirthyr_1962 |  -1.422708   .2442093    -5.83   0.000    -1.903457   -.9419582
+ _Ibirthyr_1963 |          0  (omitted)
+ _Ibirthyr_1964 |          0  (omitted)
+ _Ibirthyr_1965 |          0  (omitted)
+ _Ibirthyr_1966 |          0  (omitted)
+ _Ibirthyr_1967 |          0  (omitted)
+ _Ibirthyr_1968 |  -.0917172   .0454155    -2.02   0.044    -.1811219   -.0023124
+ _Ibirthyr_1969 |   .1356605   .0447108     3.03   0.003      .047643     .223678
+ _Ibirthyr_1970 |   .0622568   .0393459     1.58   0.115    -.0151993    .1397129
+ _Ibirthyr_1971 |  -.1071917   .0407083    -2.63   0.009    -.1873299   -.0270535
+ _Ibirthyr_1972 |          0  (omitted)
+                |
+young#c.ch71new |
+             1  |   1.22e-06   5.60e-07     2.19   0.029     1.23e-07    2.33e-06
+                |
+young#c.en71new |
+             1  |  -.7734123   .2916722    -2.65   0.008    -1.347597   -.1992274
+                |
+  young#c.wsppc |
+             1  |   -.102275   .0945587    -1.08   0.280    -.2884229    .0838729
+                |
+           year |
+          2012  |    .139335    .026266     5.30   0.000     .0876278    .1910421
+          2013  |   .0109044   .0277468     0.39   0.695    -.0437179    .0655267
+                |
+          _cons |   8.539134   .2396683    35.63   0.000     8.067324    9.010944
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+  birthplnew |       277         277           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. // First stage (young)
+. reghdfe yeduc _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' if !missing(lwage) & !
+> missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restrict
+> ion' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
+(MWFE estimator converged in 1 iterations)
+note: _Ibirthyr_1951 omitted because of collinearity
+note: _Ibirthyr_1952 omitted because of collinearity
+note: _Ibirthyr_1953 omitted because of collinearity
+note: _Ibirthyr_1954 omitted because of collinearity
+note: _Ibirthyr_1955 omitted because of collinearity
+note: _Ibirthyr_1956 omitted because of collinearity
+note: _Ibirthyr_1963 omitted because of collinearity
+note: _Ibirthyr_1964 omitted because of collinearity
+note: _Ibirthyr_1965 omitted because of collinearity
+note: _Ibirthyr_1966 omitted because of collinearity
+note: _Ibirthyr_1967 omitted because of collinearity
+note: _Ibirthyr_1972 omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     75,763
+Absorbing 1 HDFE group                            F(  16,    276) =      60.69
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1071
+                                                  Adj R-squared   =     0.1036
+                                                  Within R-sq.    =     0.0200
+Number of clusters (birthplnew) =        277      Root MSE        =     4.5906
+
+                              (Std. err. adjusted for 277 clusters in birthplnew)
+---------------------------------------------------------------------------------
+                |               Robust
+          yeduc | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+  _IyouXninne_1 |    .129542   .0507706     2.55   0.011     .0295951    .2294889
+ _Ibirthyr_1951 |          0  (omitted)
+ _Ibirthyr_1952 |          0  (omitted)
+ _Ibirthyr_1953 |          0  (omitted)
+ _Ibirthyr_1954 |          0  (omitted)
+ _Ibirthyr_1955 |          0  (omitted)
+ _Ibirthyr_1956 |          0  (omitted)
+ _Ibirthyr_1957 |  -.7665513   .3020999    -2.54   0.012    -1.361264   -.1718386
+ _Ibirthyr_1958 |   -.557374   .2996877    -1.86   0.064    -1.147338      .03259
+ _Ibirthyr_1959 |  -.3368413    .308162    -1.09   0.275    -.9434879    .2698052
+ _Ibirthyr_1960 |  -.2258316   .2945416    -0.77   0.444    -.8056652    .3540019
+ _Ibirthyr_1961 |  -.1390127   .2988903    -0.47   0.642    -.7274071    .4493816
+ _Ibirthyr_1962 |   .0306438   .3002968     0.10   0.919    -.5605194     .621807
+ _Ibirthyr_1963 |          0  (omitted)
+ _Ibirthyr_1964 |          0  (omitted)
+ _Ibirthyr_1965 |          0  (omitted)
+ _Ibirthyr_1966 |          0  (omitted)
+ _Ibirthyr_1967 |          0  (omitted)
+ _Ibirthyr_1968 |   .2459827   .0677479     3.63   0.000     .1126144    .3793511
+ _Ibirthyr_1969 |   .3192398   .0694041     4.60   0.000     .1826111    .4558685
+ _Ibirthyr_1970 |   .2000735   .0591418     3.38   0.001     .0836472    .3164998
+ _Ibirthyr_1971 |   .0418865   .0627223     0.67   0.505    -.0815883    .1653613
+ _Ibirthyr_1972 |          0  (omitted)
+                |
+young#c.ch71new |
+             1  |   2.30e-06   5.86e-07     3.92   0.000     1.15e-06    3.45e-06
+                |
+young#c.en71new |
+             1  |  -.3470265   .3724891    -0.93   0.352    -1.080307    .3862541
+                |
+  young#c.wsppc |
+             1  |  -.1592263   .0927608    -1.72   0.087    -.3418349    .0233822
+                |
+           year |
+          2012  |   1.089217   .0536389    20.31   0.000     .9836241    1.194811
+          2013  |   .1146681    .042078     2.73   0.007     .0318335    .1975027
+                |
+          _cons |   9.050097   .2907564    31.13   0.000     8.477715    9.622479
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+  birthplnew |       277         277           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. // Reduced form (young)
+. reghdfe lwage _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' if !missing(lwage) & !
+> missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restrict
+> ion' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
+(MWFE estimator converged in 1 iterations)
+note: _Ibirthyr_1951 omitted because of collinearity
+note: _Ibirthyr_1952 omitted because of collinearity
+note: _Ibirthyr_1953 omitted because of collinearity
+note: _Ibirthyr_1954 omitted because of collinearity
+note: _Ibirthyr_1955 omitted because of collinearity
+note: _Ibirthyr_1956 omitted because of collinearity
+note: _Ibirthyr_1963 omitted because of collinearity
+note: _Ibirthyr_1964 omitted because of collinearity
+note: _Ibirthyr_1965 omitted because of collinearity
+note: _Ibirthyr_1966 omitted because of collinearity
+note: _Ibirthyr_1967 omitted because of collinearity
+note: _Ibirthyr_1972 omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     75,763
+Absorbing 1 HDFE group                            F(  16,    276) =      74.56
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1119
+                                                  Adj R-squared   =     0.1084
+                                                  Within R-sq.    =     0.0272
+Number of clusters (birthplnew) =        277      Root MSE        =     0.7495
+
+                              (Std. err. adjusted for 277 clusters in birthplnew)
+---------------------------------------------------------------------------------
+                |               Robust
+          lwage | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------+----------------------------------------------------------------
+  _IyouXninne_1 |   .0198219   .0086988     2.28   0.023     .0026975    .0369464
+ _Ibirthyr_1951 |          0  (omitted)
+ _Ibirthyr_1952 |          0  (omitted)
+ _Ibirthyr_1953 |          0  (omitted)
+ _Ibirthyr_1954 |          0  (omitted)
+ _Ibirthyr_1955 |          0  (omitted)
+ _Ibirthyr_1956 |          0  (omitted)
+ _Ibirthyr_1957 |   .1551105   .0515219     3.01   0.003     .0536847    .2565363
+ _Ibirthyr_1958 |   .1999066   .0510974     3.91   0.000     .0993165    .3004968
+ _Ibirthyr_1959 |   .2416651   .0507231     4.76   0.000     .1418118    .3415184
+ _Ibirthyr_1960 |   .2249841   .0519029     4.33   0.000     .1228082    .3271601
+ _Ibirthyr_1961 |   .2307036   .0517223     4.46   0.000     .1288833    .3325238
+ _Ibirthyr_1962 |   .2467976    .049695     4.97   0.000     .1489683    .3446269
+ _Ibirthyr_1963 |          0  (omitted)
+ _Ibirthyr_1964 |          0  (omitted)
+ _Ibirthyr_1965 |          0  (omitted)
+ _Ibirthyr_1966 |          0  (omitted)
+ _Ibirthyr_1967 |          0  (omitted)
+ _Ibirthyr_1968 |   .0806494   .0119365     6.76   0.000     .0571512    .1041475
+ _Ibirthyr_1969 |   .0538565   .0101546     5.30   0.000     .0338662    .0738468
+ _Ibirthyr_1970 |   .0459092   .0104251     4.40   0.000     .0253865     .066432
+ _Ibirthyr_1971 |   .0130673   .0109549     1.19   0.234    -.0084984    .0346331
+ _Ibirthyr_1972 |          0  (omitted)
+                |
+young#c.ch71new |
+             1  |   5.56e-07   9.13e-08     6.09   0.000     3.76e-07    7.36e-07
+                |
+young#c.en71new |
+             1  |  -.0531068   .0634813    -0.84   0.404    -.1780759    .0718622
+                |
+  young#c.wsppc |
+             1  |   .0042108   .0142688     0.30   0.768    -.0238787    .0323003
+                |
+           year |
+          2012  |    .255873   .0104932    24.38   0.000      .235216    .2765299
+          2013  |   .1998024   .0077883    25.65   0.000     .1844703    .2151345
+                |
+          _cons |   14.01555   .0490971   285.47   0.000      13.9189     14.1122
+---------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+  birthplnew |       277         277           0    *|
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. 
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/ReplicatingHsiao.log
+  log type:  text
+ closed on:  27 Jul 2023, 18:28:09
+------------------------------------------------------------------------------------------------------------------

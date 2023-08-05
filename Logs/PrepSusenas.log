@@ -1,0 +1,147 @@
+------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/PrepSusenas.log
+  log type:  text
+ opened on:  27 Jul 2023, 18:26:39
+
+. 
+. foreach data_source in FullFour HarvardLibrary {
+  2. 
+.         use "RawData/susenas_`data_source'.dta", clear
+  3. 
+.         keep if JK == 1 // men
+  4.         gen regy2010 = B5_TL1 * 100 + B5_TL2 // Each two digits
+  5.         joinby regy2010 using "Concordances/SUPAS 1995-2010 regency concordance.dta", unmatched(master)
+  6.         rename regy2010 birthpl_SUSENAS
+  7. 
+. 
+. 
+.         rename survey_year year
+  8.         gen birthyr = year - UMUR
+  9.         rename weight wt
+ 10.         rename HB relate
+ 11.         rename regy1995shareinregy2010 birthpl_imputation_wt
+ 12.         rename B5_TL1 birthprov
+ 13.         rename id1995a_bplreg birthpl
+ 14.         drop JK UMUR B5_TL2 _merge
+ 15. 
+. 
+.         rename B5R15 school_attempted
+ 16.         rename B5R16 attempted_years 
+ 17.         rename B5R17 highest_diploma
+ 18.         rename B5R24B employed
+ 19.         rename B5R31 self_employed
+ 20. 
+. 
+.         * This is how we think Roodman meant to calculate years of schooling.
+.         generate years_schooling_base = school_attempted
+ 21.         recode years_schooling_base (1 2 3 = 0) (4 5 6 = 6) (7 8 9 10 = 9) (11 12 13 = 12) (14 = 16)
+ 22.         generate years_schooling_add = attempted_years - 1 if attempted_years >= 1
+ 23.         replace years_schooling_add = 0 if attempted_years == 0
+ 24.         replace years_schooling_add = 6 if inrange(school_attempted, 1, 3) & attempted_years == 8
+ 25.         replace years_schooling_add = 3 if (inrange(school_attempted, 4, 10) | school_attempted == 12 | schoo
+> l_attempted == 13) & attempted_years == 8
+ 26.         replace years_schooling_add = 1 if school_attempted == 11 & attempted_years == 8
+ 27.         replace years_schooling_add = 0 if school_attempted == 14 & (attempted_years == 6 | attempted_years =
+> = 7)
+ 28.         replace years_schooling_add = 2 if school_attempted == 14 & attempted_years == 8
+ 29.         generate years_schooling_correct = years_schooling_base + years_schooling_add
+ 30.         
+.         drop years_schooling_base years_schooling_add
+ 31. 
+.         * This is how Roodman calculates it in his original code
+.         gen school_attempted_Roodman = school_attempted
+ 32.         replace school_attempted_Roodman = 0 if missing(school_attempted) // He doesn't do this explicitly, b
+> ut somehow in what he stores in SQL all the missings are 0
+ 33.         recode school_attempted_Roodman (1 2 3 = 0) (4 5 6 = 6) (7 8 9 10 = 9) (11 12 13 14 = 12), gen(years_
+> schooling)  // years of schooling *before* each schooling level
+ 34.         mat completionyears = 6, 6, 6, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 5  // max years in schooling levels; use
+> d when p518=8, meaning "completed"
+ 35.         replace years_schooling = years_schooling + cond(school_attempted_Roodman<8, school_attempted_Roodman
+> , completionyears[1, school_attempted_Roodman]) if school_attempted_Roodman>0
+ 36. 
+.         rename years_schooling years_schooling_Roodman
+ 37. 
+.         * This is how Hsiao measures years of schooling
+.         generate years_schooling = highest_diploma
+ 38.         recode years_schooling (1 = 0) (2 3 4 = 6) (5 6 7 = 9) (8 9 10 11 = 12) (12 = 14) (13 = 15) (14 = 16)
+>  (15 = 18)
+ 39. 
+.         rename years_schooling years_schooling_Hsiao
+ 40. 
+.         recode employed (1=1) (2 3 4=0)
+ 41.         recode self_employed (1 2 3=1) (4 5 6=0)
+ 42.         replace self_employed = 0 if employed == 0
+ 43.         replace self_employed = . if employed == . // following Hsiao
+ 44. 
+. 
+. 
+.         gen int dum = cond(birthyr<1962, 1900+100, birthyr) // Esther pools the birth years of those too old to 
+> be in the IV specification
+ 45.         gen byte age74 = 1974 - birthyr
+ 46.         gen byte old = age74 <= 17 & age74 >= 12
+ 47.         gen byte young = !old if (age74>=2 & age74 <= 6) | old  // young dummy missing outside of ages 2-6, 1
+> 2-17, so will restrict samples
+ 48.         gen byte reallyold = age74 <= 24 & age74 >= 18
+ 49. 
+.         keep if 24>=age74 & age74>=2
+ 50. 
+.         save "CleanData/CompareToRoodmanPreppedData_`data_source'.dta", replace
+ 51. 
+. }
+(2,205,405 observations deleted)
+(267,449 missing values generated)
+(1731079 changes made to years_schooling_base)
+(349,623 missing values generated)
+(82,174 real changes made)
+(340,590 real changes made)
+(646,337 real changes made)
+(8,337 real changes made)
+(1,604 real changes made)
+(7,536 real changes made)
+(267,449 missing values generated)
+(267,449 missing values generated)
+(267,449 real changes made)
+(1731079 differences between school_attempted_Roodman and years_schooling)
+(1,880,175 real changes made)
+(267,449 missing values generated)
+(1880175 changes made to years_schooling)
+(518529 changes made to employed)
+(1006415 changes made to self_employed)
+(362,965 real changes made)
+(7,230 real changes made, 7,230 to missing)
+(1,927,336 missing values generated)
+(1,677,020 observations deleted)
+file CleanData/CompareToRoodmanPreppedData_FullFour.dta saved
+(1,931,246 observations deleted)
+(307,981 missing values generated)
+(1513986 changes made to years_schooling_base)
+(307,981 missing values generated)
+(0 real changes made)
+(299,045 real changes made)
+(565,856 real changes made)
+(7,391 real changes made)
+(1,421 real changes made)
+(6,522 real changes made)
+(307,981 missing values generated)
+(307,981 missing values generated)
+(307,981 real changes made)
+(1513986 differences between school_attempted_Roodman and years_schooling)
+(1,645,491 real changes made)
+(307,981 missing values generated)
+(1645491 changes made to years_schooling)
+(453060 changes made to employed)
+(881707 changes made to self_employed)
+(417,276 real changes made)
+(8,328 real changes made, 8,328 to missing)
+(1,687,910 missing values generated)
+(1,467,631 observations deleted)
+file CleanData/CompareToRoodmanPreppedData_HarvardLibrary.dta saved
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/PrepSusenas.log
+  log type:  text
+ closed on:  27 Jul 2023, 18:27:30
+------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,574 @@
+------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/SUPAS1995_Reanalysis.log
+  log type:  text
+ opened on:  27 Jul 2023, 18:28:31
+
+. // ssc install reghdfe
+. // ssc install ivreg2
+. // ssc install estout
+. // ssc install ftools
+. // ssc install avar
+. // ssc install weakivtest
+. // ssc install weakiv
+. // ssc install ranktest
+. // ssc install boottest 
+. 
+. 
+. * Redoing Duflo (2001)'s analysis of 1995 SUPAS
+. 
+. * Loading and clean data
+. 
+. use "RawData/original_Duflo_2001_inpres_data.dta", clear
+
+. merge m:1 birthpl using "RawData/regency_level_vars_Roodman.dta", keep(match master)
+(variable nin was float, now double to accommodate using data's values)
+(variable ch71 was float, now double to accommodate using data's values)
+(variable en71 was float, now double to accommodate using data's values)
+(variable wsppc was float, now double to accommodate using data's values)
+(variable dens71 was float, now double to accommodate using data's values)
+(variable moldyed was float, now double to accommodate using data's values)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           152,990  (_merge==3)
+    -----------------------------------------
+
+. rename ch71 kids_in_birthpl
+
+. rename ch71new newkids_in_birthpl
+
+. rename nin schools_built
+
+. rename ninnew newschools_built
+
+. rename yeduc education
+
+. rename treat2b young
+
+. rename treat1b old
+
+. rename p504thn YOB
+
+. rename lwage ln_monthly_wage
+
+. rename lhwage ln_hourly_wage
+
+. rename recp treatment_village
+
+. rename birthpl birthpl
+  (all newnames==oldnames)
+
+. rename wsppc water_program
+
+. rename p504th birthyear_1950_last
+
+. keep kids_in_birthpl newkids_in_birthpl schools_built newschools_built education young old YOB ln_hourly_wage ln
+> _monthly_wage treatment_village birthpl weight
+
+. drop if missing(ln_hourly_wage)
+(92,327 observations deleted)
+
+. generate pooled_YOB = cond(YOB < 62, 100, YOB)
+
+. generate older = (YOB < 56)
+
+. 
+. qui xi i.young*schools_built i.young*newschools_built i.pooled_YOB*schools_built i.pooled_YOB*newschools_built i
+> .YOB*kids_in_birthpl i.YOB*newkids_in_birthpl
+
+. 
+. xtset birthpl
+
+Panel variable: birthpl (unbalanced)
+
+. 
+. 
+. local YOB_X_kids_in_birthpl = "_IYOBXkids*"
+
+. local YOB_X_newkids_in_birthpl = "_IYOBXnewk*"
+
+. local birthyr_FEs = "_IYOB_*"
+
+. local pooled_YOB_X_schools_built = "_IpooXsch*"
+
+. local pooled_YOB_X_newschools_built = "_IpooXnew*"
+
+. local young_X_schools_built = "_IyouXschoo_1"
+
+. local young_X_newschools_built = "_IyouXnewsc_1"
+
+. 
+. 
+. * Table 1
+. 
+. * I do Panel D first because Panels A, B, and C use a subset of the data, while Panel D uses the whole thing.
+. 
+. * Panel D: 2SLS using interaction of Year of Birth dummies (pooling all those born before 1962 into one dummy) a
+> nd Schools Constructed
+. 
+. 
+. eststo, title("Esther"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `Y
+> OB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') small fe
+(est1 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, Rademacher weights:
+  education
+
+              F(11, 60608) =     1.1344
+                  Prob > F =     0.2664
+
+95% confidence set for null hypothesis expression: [−.06123, .2266]
+
+. qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.bir
+> thpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  2.7009414
+(obs=60,663)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        2.701
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    21.585     4.460
+tau=10%                   12.249     3.208
+tau=20%                    7.356     2.535
+tau=30%                    5.642     2.297
+--------------------------------------------
+
+. 
+. eststo, title("Cluster"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `
+> YOB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') cluster(birthpl) small fe
+(est2 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                F(11, 289) =     0.9032
+                  Prob > F =     0.7624
+
+95% confidence set for null hypothesis expression: (−∞, ∞)
+(A confidence interval could not be bounded. Try widening the search range with the gridmin() and gridmax() option
+> s.)
+
+. qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.bir
+> thpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  2.7009414
+(obs=60,663)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        0.331
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    36.371    77.893
+tau=10%                   22.339    44.914
+tau=20%                   14.473    27.046
+tau=30%                   11.527    20.560
+--------------------------------------------
+
+. 
+. eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' 
+> `YOB_X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+(est3 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                F(11, 289) =     1.2820
+                  Prob > F =     0.4238
+
+95% confidence set for null hypothesis expression: (−∞, ∞)
+(A confidence interval could not be bounded. Try widening the search range with the gridmin() and gridmax() option
+> s.)
+
+. qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl'
+>  i.birthpl, partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  1.4806724
+(obs=60,663)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        0.171
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    36.391    77.444
+tau=10%                   22.357    44.682
+tau=20%                   14.489    26.926
+tau=30%                   11.541    20.479
+--------------------------------------------
+
+. 
+. eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs
+> ' `YOB_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) sma
+> ll fe
+(est4 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                F(11, 289) =     2.1255
+                  Prob > F =     0.0555
+
+95% confidence set for null hypothesis expression: (−∞, ∞)
+(A confidence interval could not be bounded. Try widening the search range with the gridmin() and gridmax() option
+> s.)
+
+. qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl'
+>  i.birthpl [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  1.7524842
+(sum of wgt is 13,385,875)
+(obs=60,663)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        0.337
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    35.183    76.827
+tau=10%                   21.486    44.049
+tau=20%                   13.836    26.353
+tau=30%                   10.980    19.951
+--------------------------------------------
+
+. 
+. esttab, b(%6.3f) se(%6.3f) title("Table 1D: 2SLS using interaction of YOB Dummies with Schools Constructed") mti
+> tles noconstant nonumbers /*noobs*/ nonotes nolabel keep(education) varwidth(13) coeflabels(education "ln(Hour W
+> age)")
+(tabulating estimates stored by eststo; specify "." to tabulate the active results)
+
+Table 1D: 2SLS using interaction of YOB Dummies with Schools Constructed
+-----------------------------------------------------------------------------
+                    Esther         Cluster           Typos         Weights   
+-----------------------------------------------------------------------------
+ln(Hour Wage)        0.068*          0.068*          0.108*          0.136** 
+                   (0.028)         (0.034)         (0.048)         (0.050)   
+-----------------------------------------------------------------------------
+N                    60663           60663           60663           60663   
+-----------------------------------------------------------------------------
+
+. 
+. 
+. 
+. * Panels A, B, and C restrict analysis to those in the Old and Young cohorts.
+. 
+. keep if (young == 1 | old == 1)
+(29,602 observations deleted)
+
+. 
+. * Panel A: First Stage
+. 
+. quietly eststo clear
+
+. eststo, title("Duflo"): quietly reghdfe education young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl Y
+> OB)
+(est1 stored)
+
+. eststo, title("Cluster"): quietly reghdfe education young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl
+>  YOB) vce(cluster birthpl)
+(est2 stored)
+
+. eststo, title("Typos"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl, absorb(bir
+> thpl YOB) vce(cluster birthpl)
+(est3 stored)
+
+. eststo, title("Weights"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl [aw = wei
+> ght], absorb(birthpl YOB) vce(cluster birthpl)
+(est4 stored)
+
+. esttab, b(%6.3f) se(%6.3f) title("Table 1A: First Stage (Years of Schooling)") mtitles noconstant nonumbers noob
+> s nonotes nolabel varwidth(12) keep(1.young*#c.schools_built*) coeflabels(1.young#c.schools_built "Education" 1.
+> young#c.newschools_built "Education")
+
+Table 1A: First Stage (Years of Schooling)
+----------------------------------------------------------------------------
+                    Duflo         Cluster           Typos         Weights   
+----------------------------------------------------------------------------
+Education           0.196***        0.196***                                
+                  (0.042)         (0.048)                                   
+----------------------------------------------------------------------------
+
+. 
+. 
+. * Panel B: Reduced Form
+. 
+. eststo clear
+
+. eststo, title("Duflo"): quietly reghdfe ln_hourly_wage young##c.schools_built YOB#c.kids_in_birthpl, absorb(birt
+> hpl YOB)
+(est1 stored)
+
+. eststo, title("Cluster"): quietly reghdfe ln_hourly_wage young##c.schools_built YOB#c.kids_in_birthpl, absorb(bi
+> rthpl YOB) vce(cluster birthpl)
+(est2 stored)
+
+. eststo, title("Typos"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl, absor
+> b(birthpl YOB) vce(cluster birthpl)
+(est3 stored)
+
+. eststo, title("Weights"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl [aw 
+> = weight], absorb(birthpl YOB) vce(cluster birthpl)
+(est4 stored)
+
+. esttab, b(%6.3f) se(%6.3f) title("Table 1B: Reduced Form (log Hourly Wage)") mtitles noconstant nonumbers noobs 
+> nonotes nolabel varwidth(13) keep(1.young*#c.schools_built*) coeflabels(1.young#c.schools_built "ln(Hour Wage)" 
+> 1.young#c.newschools_built "ln(Hour Wage)")
+
+Table 1B: Reduced Form (log Hourly Wage)
+-----------------------------------------------------------------------------
+                     Duflo         Cluster           Typos         Weights   
+-----------------------------------------------------------------------------
+ln(Hour Wage)        0.015*          0.015                                   
+                   (0.007)         (0.009)                                   
+-----------------------------------------------------------------------------
+
+. 
+. 
+. * Panel C: 2SLS using interaction of Young Dummy with Schools Constructed as instrument, subset to only Young an
+> d Old cohorts
+. 
+. eststo clear
+
+. eststo, title("Esther"): qui xtivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_
+> kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') small fe
+(est1 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, Rademacher weights:
+  education
+
+                        t(31040) =     2.0310
+                        Prob>|t| =     0.0425
+
+95% confidence set for null hypothesis expression: [.00282, .1524]
+
+. qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl,
+>  partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  21.308712
+(obs=31,061)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:       21.309
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    37.418    37.418
+tau=10%                   23.109    23.109
+tau=20%                   15.062    15.062
+tau=30%                   12.039    12.039
+--------------------------------------------
+
+. 
+. eststo, title("Cluster"): qui xtivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X
+> _kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') cluster(birthpl) small fe
+(est2 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                          t(289) =     1.7219
+                        Prob>|t| =     0.0867
+
+95% confidence set for null hypothesis expression: [−.01432, .1764]
+
+. qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl,
+>  partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  21.308712
+(obs=31,061)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:       16.168
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    37.418    37.418
+tau=10%                   23.109    23.109
+tau=20%                   15.062    15.062
+tau=30%                   12.039    12.039
+--------------------------------------------
+
+. 
+. eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_
+> X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+(est3 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                          t(289) =     1.7345
+                        Prob>|t| =     0.0795
+
+95% confidence set for null hypothesis expression: [−.0252, .3107]
+
+. qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.bi
+> rthpl, partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  10.509678
+(obs=31,061)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        7.450
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    37.418    37.418
+tau=10%                   23.109    23.109
+tau=20%                   15.062    15.062
+tau=30%                   12.039    12.039
+--------------------------------------------
+
+. 
+. eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YO
+> B_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+(est4 stored)
+
+. boottest, ar reps(9999)
+
+Wild bootstrap-t, null imposed, 9999 replications, Anderson-Rubin Wald test, bootstrap clustering by birthpl, Rade
+> macher weights:
+  education
+
+                          t(289) =     1.0754
+                        Prob>|t| =     0.2988
+
+95% confidence set for null hypothesis expression: [−.4416, .7975]
+
+. qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.bi
+> rthpl [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+
+. weakivtest
+
+symmetric __000003[1,1]
+           c1
+r1  6.8222636
+(sum of wgt is 6,889,951)
+(obs=31,061)
+
+Montiel-Pflueger robust weak instrument test
+--------------------------------------------
+Effective F statistic:        4.242
+Confidence level alpha:          5%
+--------------------------------------------
+
+--------------------------------------------
+Critical Values             TSLS      LIML
+--------------------------------------------
+% of Worst Case Bias
+tau=5%                    37.418    37.418
+tau=10%                   23.109    23.109
+tau=20%                   15.062    15.062
+tau=30%                   12.039    12.039
+--------------------------------------------
+
+. 
+. 
+. esttab, b(%6.3f) se(%6.3f) title("Table 1C: 2SLS using interaction of Young Dummy with Schools Constructed") mti
+> tles noconstant nonumbers /*noobs*/ nonotes nolabel keep(education) varwidth(13) coeflabels(education "ln(Hour W
+> age)")
+(tabulating estimates stored by eststo; specify "." to tabulate the active results)
+
+Table 1C: 2SLS using interaction of Young Dummy with Schools Constructed
+-----------------------------------------------------------------------------
+                    Esther         Cluster           Typos         Weights   
+-----------------------------------------------------------------------------
+ln(Hour Wage)        0.075*          0.075           0.117*          0.109   
+                   (0.034)         (0.040)         (0.058)         (0.090)   
+-----------------------------------------------------------------------------
+N                    31061           31061           31061           31061   
+-----------------------------------------------------------------------------
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/SUPAS1995_Reanalysis.log
+  log type:  text
+ closed on:  27 Jul 2023, 19:11:33
+------------------------------------------------------------------------------------------------------------------
