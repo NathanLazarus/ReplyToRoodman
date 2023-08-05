@@ -33,7 +33,7 @@ program define do_analysis
 	else if "`inflation'" == "Hsiao" {
 	}
 	else {
-		di "argument: inflation not correctly specified"
+		di as error "argument: inflation not correctly specified"
 		exit
 	}
 
