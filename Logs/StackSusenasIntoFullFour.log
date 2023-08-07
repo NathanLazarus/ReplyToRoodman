@@ -1,0 +1,167 @@
+--------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/StackSusen
+> asIntoFullFour.log
+  log type:  text
+ opened on:   7 Aug 2023, 15:08:47
+
+. 
+. import dbase "RawData/Susenas_HarvardLibrary/kor11ind.dbf", clear
+(125 vars, 1,118,239 obs)
+
+. save "RawData/Susenas_data_as_dta/kor11ind.dta", replace
+file RawData/Susenas_data_as_dta/kor11ind.dta saved
+
+. import dbase "RawData/Susenas_HarvardLibrary/kor12ind.dbf", clear
+(123 vars, 1,114,445 obs)
+
+. save "RawData/Susenas_data_as_dta/kor12ind.dta", replace
+file RawData/Susenas_data_as_dta/kor12ind.dta saved
+
+. import dbase "RawData/Susenas_HarvardLibrary/kor2013ind_backcast.dbf", clear
+(125 vars, 1,094,179 obs)
+
+. save "RawData/Susenas_data_as_dta/kor13ind.dta", replace
+file RawData/Susenas_data_as_dta/kor13ind.dta saved
+
+. tempfile additional_variables_2014
+
+. import dbase "RawData/Susenas_WePurchased/2014_kor_ind variabel terpilih.dbf",
+>  clear
+(10 vars, 1,098,280 obs)
+
+. gen obs_num = _n
+
+. save `additional_variables_2014', replace
+(file C:\Users\Nathan\AppData\Local\Temp\ST_161c_000001.tmp not found)
+file C:\Users\Nathan\AppData\Local\Temp\ST_161c_000001.tmp saved as .dta
+    format
+
+. import dbase "RawData/Susenas_WePurchased/2014_kor_ind_24492.dbf", clear
+(13 vars, 1,098,280 obs)
+
+. gen obs_num = _n
+
+. merge 1:1 obs_num using `additional_variables_2014', nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                         1,098,280  
+    -----------------------------------------
+
+. drop obs_num
+
+. save "RawData/Susenas_data_as_dta/kor14ind.dta", replace
+file RawData/Susenas_data_as_dta/kor14ind.dta saved
+
+. import dbase "RawData/Susenas_HarvardLibrary/2014kor14ind_tw1.dbf", clear
+(124 vars, 274,673 obs)
+
+. save "RawData/Susenas_data_as_dta/kor14ind_q1.dta", replace
+file RawData/Susenas_data_as_dta/kor14ind_q1.dta saved
+
+. import dbase "RawData/Susenas_HarvardLibrary/kor14ind_tw3.dbf", clear
+(124 vars, 274,269 obs)
+
+. save "RawData/Susenas_data_as_dta/kor14ind_q3.dta", replace
+file RawData/Susenas_data_as_dta/kor14ind_q3.dta saved
+
+. 
+. use "RawData/Susenas_data_as_dta/kor11ind.dta", clear
+
+. gen survey_year = 2011
+
+. gen double weight = FWT
+
+. append using "RawData/Susenas_data_as_dta/kor12ind.dta"
+(variable B5R38L was str50, now str71 to accommodate using data's values)
+
+. replace survey_year = 2012 if missing(survey_year)
+(1,114,445 real changes made)
+
+. replace weight = WEIND if survey_year == 2012
+(1,114,445 real changes made)
+
+. append using "RawData/Susenas_data_as_dta/kor13ind.dta"
+(variable B5R38L was str71, now str89 to accommodate using data's values)
+
+. replace survey_year = 2013 if missing(survey_year)
+(1,094,179 real changes made)
+
+. replace weight = FWT_TAHUN if survey_year == 2013
+(1,094,179 real changes made)
+
+. append using "RawData/Susenas_data_as_dta/kor14ind.dta"
+
+. replace survey_year = 2014 if missing(survey_year)
+(1,098,280 real changes made)
+
+. replace weight = FWT_TAHUN if survey_year == 2014
+(1,098,280 real changes made)
+
+. 
+. keep JK UMUR HB B5_TL1 B5_TL2 B5R15 B5R16 B5R17 B5R24B B5R28B B5R29 B5R31 weig
+> ht survey_year
+
+. 
+. save "RawData/susenas_FullFour.dta", replace
+file RawData/susenas_FullFour.dta saved
+
+. 
+. use "RawData/Susenas_data_as_dta/kor11ind.dta", clear
+
+. gen survey_year = 2011
+
+. gen double weight = FWT
+
+. append using "RawData/Susenas_data_as_dta/kor12ind.dta"
+(variable B5R38L was str50, now str71 to accommodate using data's values)
+
+. replace survey_year = 2012 if missing(survey_year)
+(1,114,445 real changes made)
+
+. replace weight = WEIND if survey_year == 2012
+(1,114,445 real changes made)
+
+. append using "RawData/Susenas_data_as_dta/kor13ind.dta"
+(variable B5R38L was str71, now str89 to accommodate using data's values)
+
+. replace survey_year = 2013 if missing(survey_year)
+(1,094,179 real changes made)
+
+. replace weight = FWT_TAHUN if survey_year == 2013
+(1,094,179 real changes made)
+
+. append using "RawData/Susenas_data_as_dta/kor14ind_q1.dta"
+
+. replace weight = FWT if missing(survey_year)
+(274,673 real changes made)
+
+. replace survey_year = 2014 if missing(survey_year)
+(274,673 real changes made)
+
+. append using "RawData/Susenas_data_as_dta/kor14ind_q3.dta"
+
+. replace weight = FWT_TRIWUL if missing(survey_year) 
+(274,269 real changes made)
+
+. replace survey_year = 2014 if missing(survey_year)
+(274,269 real changes made)
+
+. 
+. keep JK UMUR HB B1R1 B1R2 B5_TL1 B5_TL2 B5R15 B5R16 B5R17 B5R24B B5R28B B5R29 
+> B5R31 weight survey_year
+
+. 
+. save "RawData/susenas_HarvardLibrary.dta", replace
+file RawData/susenas_HarvardLibrary.dta saved
+
+. 
+. log close
+      name:  <unnamed>
+       log:  C:\Users\Nathan\Downloads\RoodmanWithFourYearsFinal\Logs/StackSusen
+> asIntoFullFour.log
+  log type:  text
+ closed on:   7 Aug 2023, 15:14:26
+--------------------------------------------------------------------------------
