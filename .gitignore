@@ -1,4 +1,7 @@
 RawData/*
 !RawData/regency_level_vars_Roodman.dta
+!RawData/*/
+RawData/*/*
+!.gitkeep
 CleanData/*
 !CleanData/.gitkeep
