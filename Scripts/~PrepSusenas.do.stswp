@@ -5,7 +5,9 @@
 cap log close
 log using Logs/PrepSusenas.log, replace
 
-foreach data_source in FullFour HarvardLibrary {
+local data_source = "FullFour"
+
+// foreach data_source in FullFour HarvardLibrary {
 
 	use "RawData/susenas_`data_source'.dta", clear
 
@@ -34,9 +36,6 @@ foreach data_source in FullFour HarvardLibrary {
 
 
 	* This is how we think Roodman meant to calculate years of schooling.
-	replace school_attempted = 0 if missing(school_attempted)
-	// correct for the fact that in 2011-2013, people who say they were never in school
-	// are marked as missing for school_attempted and attempted_years (in 2014 they're (0,0))
 	generate years_schooling_base = school_attempted
 	recode years_schooling_base (1 2 3 = 0) (4 5 6 = 6) (7 8 9 10 = 9) (11 12 13 = 12) (14 = 16)
 	generate years_schooling_add = attempted_years - 1 if attempted_years >= 1
@@ -52,6 +51,7 @@ foreach data_source in FullFour HarvardLibrary {
 
 	* This is how Roodman calculates it in his original code
 	gen school_attempted_Roodman = school_attempted
+	replace school_attempted_Roodman = 0 if missing(school_attempted) // He doesn't do this explicitly, but somehow in what he stores in SQL all the missings are 0
 	recode school_attempted_Roodman (1 2 3 = 0) (4 5 6 = 6) (7 8 9 10 = 9) (11 12 13 14 = 12), gen(years_schooling)  // years of schooling *before* each schooling level
 	mat completionyears = 6, 6, 6, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 5  // max years in schooling levels; used when p518=8, meaning "completed"
 	replace years_schooling = years_schooling + cond(school_attempted_Roodman<8, school_attempted_Roodman, completionyears[1, school_attempted_Roodman]) if school_attempted_Roodman>0
@@ -66,6 +66,7 @@ foreach data_source in FullFour HarvardLibrary {
 
 	recode employed (1=1) (2 3 4=0)
 	recode self_employed (1 2 3 6=1) (4 5=0)
+	replace self_employed = 0 if employed == 0
 	replace self_employed = . if employed == . // following Hsiao
 
 

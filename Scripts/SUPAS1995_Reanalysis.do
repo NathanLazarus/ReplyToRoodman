@@ -40,8 +40,6 @@ generate older = (YOB < 56)
 
 qui xi i.young*schools_built i.young*newschools_built i.pooled_YOB*schools_built i.pooled_YOB*newschools_built i.YOB*kids_in_birthpl i.YOB*newkids_in_birthpl
 
-xtset birthpl
-
 
 local YOB_X_kids_in_birthpl = "_IYOBXkids*"
 local YOB_X_newkids_in_birthpl = "_IYOBXnewk*"
@@ -51,6 +49,10 @@ local pooled_YOB_X_newschools_built = "_IpooXnew*"
 local young_X_schools_built = "_IyouXschoo_1"
 local young_X_newschools_built = "_IyouXnewsc_1"
 
+// Create birthplnew capturing the larger regencies at which treatment was assigned in 1974
+recode birthpl (1472=1403) (1804=1803) (3275=3219) (5171=5103) (5271=5201) (7173=7103) ///
+    (7271=7203) (8271=8203) (8104=8103), gen(birthplnew) // group new child regencies with parents
+
 
 * Table 1
 
@@ -58,25 +60,28 @@ local young_X_newschools_built = "_IyouXnewsc_1"
 
 * Panel D: 2SLS using interaction of Year of Birth dummies (pooling all those born before 1962 into one dummy) and Schools Constructed
 
+xtset birthpl
 
 eststo, title("Esther"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) small
+qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, small
 weakivtest
 
-eststo, title("Cluster"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') cluster(birthpl) small fe
+eststo, title("Cluster"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' `birthyr_FEs' `YOB_X_kids_in_birthpl', cluster(birthpl) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, cluster(birthpl) small
 weakivtest
 
-eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+xtset birthplnew
+
+eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthplnew) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthplnew, cluster(birthplnew) small
 weakivtest
 
-eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthplnew) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `pooled_YOB_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthplnew [aw=weight], cluster(birthplnew) small
 weakivtest
 
 esttab, b(%6.3f) se(%6.3f) title("Table 1D: 2SLS using interaction of YOB Dummies with Schools Constructed") mtitles noconstant nonumbers /*noobs*/ nonotes nolabel keep(education) varwidth(13) coeflabels(education "ln(Hour Wage)")
@@ -92,8 +97,8 @@ keep if (young == 1 | old == 1)
 quietly eststo clear
 eststo, title("Duflo"): quietly reghdfe education young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl YOB)
 eststo, title("Cluster"): quietly reghdfe education young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl YOB) vce(cluster birthpl)
-eststo, title("Typos"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl, absorb(birthpl YOB) vce(cluster birthpl)
-eststo, title("Weights"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl [aw = weight], absorb(birthpl YOB) vce(cluster birthpl)
+eststo, title("Typos"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl, absorb(birthplnew YOB) vce(cluster birthplnew)
+eststo, title("Weights"): quietly reghdfe education young##c.newschools_built YOB#c.newkids_in_birthpl [aw = weight], absorb(birthplnew YOB) vce(cluster birthplnew)
 esttab, b(%6.3f) se(%6.3f) title("Table 1A: First Stage (Years of Schooling)") mtitles noconstant nonumbers noobs nonotes nolabel varwidth(12) keep(1.young*#c.schools_built*) coeflabels(1.young#c.schools_built "Education" 1.young#c.newschools_built "Education")
 
 
@@ -102,32 +107,36 @@ esttab, b(%6.3f) se(%6.3f) title("Table 1A: First Stage (Years of Schooling)") m
 eststo clear
 eststo, title("Duflo"): quietly reghdfe ln_hourly_wage young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl YOB)
 eststo, title("Cluster"): quietly reghdfe ln_hourly_wage young##c.schools_built YOB#c.kids_in_birthpl, absorb(birthpl YOB) vce(cluster birthpl)
-eststo, title("Typos"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl, absorb(birthpl YOB) vce(cluster birthpl)
-eststo, title("Weights"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl [aw = weight], absorb(birthpl YOB) vce(cluster birthpl)
+eststo, title("Typos"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl, absorb(birthplnew YOB) vce(cluster birthplnew)
+eststo, title("Weights"): quietly reghdfe ln_hourly_wage young##c.newschools_built YOB#c.newkids_in_birthpl [aw = weight], absorb(birthplnew YOB) vce(cluster birthplnew)
 esttab, b(%6.3f) se(%6.3f) title("Table 1B: Reduced Form (log Hourly Wage)") mtitles noconstant nonumbers noobs nonotes nolabel varwidth(13) keep(1.young*#c.schools_built*) coeflabels(1.young#c.schools_built "ln(Hour Wage)" 1.young#c.newschools_built "ln(Hour Wage)")
 
 
 * Panel C: 2SLS using interaction of Young Dummy with Schools Constructed as instrument, subset to only Young and Old cohorts
 
+xtset birthpl
+
 eststo clear
 eststo, title("Esther"): qui xtivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) small
+qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, small
 weakivtest
 
 eststo, title("Cluster"): qui xtivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl', partial(`birthyr_FEs' `YOB_X_kids_in_birthpl') cluster(birthpl) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `young_X_schools_built') `birthyr_FEs' `YOB_X_kids_in_birthpl' i.birthpl, cluster(birthpl) small
 weakivtest
 
-eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+xtset birthplnew
+
+eststo, title("Typos"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl', partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthplnew) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl, partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthplnew, cluster(birthplnew) small
 weakivtest
 
-eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthpl) small fe
+eststo, title("Weights"): qui xtivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl') cluster(birthplnew) small fe
 boottest, ar reps(9999)
-qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl [aw=weight], partial(`birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthpl) cluster(birthpl) small
+qui ivreg2 ln_hourly_wage (education = `young_X_newschools_built') `birthyr_FEs' `YOB_X_newkids_in_birthpl' i.birthplnew [aw=weight], cluster(birthplnew) small
 weakivtest
 
 

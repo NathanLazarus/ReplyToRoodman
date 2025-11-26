@@ -37,6 +37,23 @@ program define do_analysis
 		exit
 	}
 
+	// Use the same truncation cutoff for all years
+	sum B5R29 if year == 2011
+	local lowest_wage_observed = r(min)
+	sum B5R29 if year == 2012
+	if r(min) < `lowest_wage_observed' {
+		local lowest_wage_observed = r(min)
+	}
+	sum B5R29 if year == 2013
+	if r(min) < `lowest_wage_observed' {
+		local lowest_wage_observed = r(min)
+	}
+	sum B5R29 if year == 2014
+	if r(min) < `lowest_wage_observed' {
+		local lowest_wage_observed = r(min)
+	}
+	replace B5R29 = . if B5R29 < `lowest_wage_observed'
+
 
 	if "`regencies'" == "ours" | "`regencies'" == "ours_with_imputation_weights" {
 		recode birthpl (1472=1403) (1804=1803) (3275=3219) /*Unclear why Roodman assigns 3671 (Tangerang City) -> 3275 (Bekasi) -> 3219 (Tangerang), but the result is correct*/ ///
@@ -227,7 +244,9 @@ program define do_analysis
 
 	
 
-	gen lwage = ln(B5R29)
+	rename B5R28B hours_per_week
+
+	gen lwage = ln(B5R29 / (4 * hours_per_week))
 	xtset birthplnew
 
 
@@ -262,7 +281,7 @@ program define do_analysis
 
 	di "Single IV (young) weakivtest"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	qui ivreg2 lwage (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' i.birthplnew `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', partial(_Ibirthyr_* `additional_controls' `survey_year_FE_expression' i.birthplnew) cluster(birthplnew) small
+	qui ivreg2 lwage (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
 	weakivtest
 
 
@@ -276,7 +295,7 @@ program define do_analysis
 
 	di "Many IV (birthyr) weakivtest"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	qui ivreg2 lwage (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' i.birthplnew `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', partial(_Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' i.birthplnew) cluster(birthplnew) small
+	qui ivreg2 lwage (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
 	weakivtest
 
 
