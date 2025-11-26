@@ -12,7 +12,7 @@ log using Logs/CompareToRoodmanAndHsiao.log, replace
 
 cap program drop do_analysis
 program define do_analysis
-	args education regencies inflation omitSelfEmployed years survey_year_FEs weights regency_vars specification heads_of_household_only restrict_to_employed use_primary_for_education data_source
+	args education regencies inflation omitSelfEmployed years survey_year_FEs weights regency_vars specification heads_of_household_only restrict_to_employed use_primary_for_education data_source wage_var
 
 	use "CleanData/CompareToRoodmanPreppedData_`data_source'.dta", clear
 
@@ -242,14 +242,19 @@ program define do_analysis
 		exit
 	}
 
-	
+	if "`wage_var'" == "lhwage" {
+		rename B5R28B hours_per_week
+		gen log_wage_var = ln(B5R29 / (4 * hours_per_week))
+	}
+	else if "`wage_var'" == "lwage" {
+		gen log_wage_var = ln(B5R29)
+	}
+	else {
+		di as error "argument: wage_var not correctly specified"
+		exit
+	}
 
-	rename B5R28B hours_per_week
-
-	gen lwage = ln(B5R29 / (4 * hours_per_week))
 	xtset birthplnew
-
-
 
 	qui xi i.young|ninnew i.dum|ninnew i.birthyr*ch71new i.birthyr*en71new i.birthyr*wsppc i.year i.young|ch71new i.young|en71new  i.young|wsppc
 	set seed 230498257
@@ -265,23 +270,23 @@ program define do_analysis
 	// First stage (young)
 	di "First stage (young)"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	reghdfe yeduc _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if !missing(lwage) & !missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
+	reghdfe yeduc _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if !missing(log_wage_var) & !missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
 
 	// Reduced form (young)
 	di "Reduced form (young)"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	reghdfe lwage _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if !missing(lwage) & !missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
+	reghdfe log_wage_var _IyouXninne_1 _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if !missing(log_wage_var) & !missing(yeduc) & inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) absorb(birthplnew)
 
 
 	// Single IV (young)
 	di "Single IV (young) xtivreg"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	xtivreg2 lwage (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) partial(_Ibirthyr_* `additional_controls' `survey_year_FE_expression') small fe
+	xtivreg2 log_wage_var (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) partial(_Ibirthyr_* `additional_controls' `survey_year_FE_expression') small fe
 	boottest, ar reps(99999)
 
 	di "Single IV (young) weakivtest"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	qui ivreg2 lwage (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
+	qui ivreg2 log_wage_var (yeduc = _IyouXninne_1) _Ibirthyr_* `additional_controls' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
 	weakivtest
 
 
@@ -290,12 +295,12 @@ program define do_analysis
 
 	di "Many IV (birthyr) xtivreg"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	xtivreg2 lwage (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' `weight_statement' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) partial(_Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression') small fe
+	xtivreg2 log_wage_var (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' `weight_statement' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) partial(_Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression') small fe
 	boottest, ar reps(99999)
 
 	di "Many IV (birthyr) weakivtest"
 	di "education: `education'; regencies: `regencies'; inflation: `inflation'; omitSelfEmployed: `omitSelfEmployed'; years: `years'; survey_year_FEs: `survey_year_FEs'; weights: `weights'; regency_vars: `regency_vars'; specification: `specification'; heads_of_household_only: `heads_of_household_only'; use_primary_for_education: `use_primary_for_education'; data_source: `data_source'"
-	qui ivreg2 lwage (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
+	qui ivreg2 log_wage_var (yeduc = _IdumXnin*) _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' i.birthplnew _Ibirthyr_* `additional_controls_manyIV' `survey_year_FE_expression' `weight_statement_ivreg2' if inlist(year,`years') `hoh_restriction' `birthpl_imputation_wt_restrict' `self_employed_restriction' `employed_restriction', cluster(birthplnew) small
 	weakivtest
 
 
@@ -317,36 +322,40 @@ local heads_of_household_only = "True" // "False" or "True"
 local restrict_to_employed = "True" // "False" or "True"
 local use_primary_for_education = "False" // "False" or "True"
 local data_source = "HarvardLibrary" // "FullFour" or "HarvardLibrary"
+local wage_var = "lhwage" // "lwage" or "lhwage"
 
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+local wage_var = "lwage"
+
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local regency_vars = "Roodman" // Corrects Esther typos (there are also a few ninpres values where Hsiao disagrees with both Esther and Roodman, unclear)
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local inflation = "ours" // Hsiao doesn't correct for inflation
 local regencies = "ours" // This uses our regency definitions
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local education = "ours"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local data_source = "FullFour"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local heads_of_household_only = "False"
 local restrict_to_employed = "False"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local specification = "Roodman" // This runs the regressions with Roodman's controls (birth year*children in district) instead of Hsiao's (young*children in district, young*number of enrolled children, young*water and sanitation spending)
 local survey_year_FEs = "False" // Hsiao also includes survey year fixed effects
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 
 // Starting from Roodman
@@ -364,35 +373,36 @@ local heads_of_household_only = "False" // "False" or "True"
 local restrict_to_employed = "False" // "False" or "True"
 local use_primary_for_education = "False" // "False" or "True"
 local data_source = "FullFour" // "FullFour" or "HarvardLibrary"
+local wage_var = "lhwage" // "lwage" or "lhwage"
 
 // Roodman's numbers
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local education = "ours"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local regencies = "ours"
 local inflation = "ours"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local omitSelfEmployed = "True"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local years = "2011,2012"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local years = "2011,2012,2013,2014"
 
 // Mikey's numbers
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local weights = "True"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 
 
@@ -412,35 +422,36 @@ local heads_of_household_only = "False" // "False" or "True"
 local restrict_to_employed = "False" // "False" or "True"
 local use_primary_for_education = "True" // "False" or "True"
 local data_source = "FullFour" // "FullFour" or "HarvardLibrary"
+local wage_var = "lhwage" // "lwage" or "lhwage"
 
 // Roodman's numbers
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local education = "ours"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local regencies = "ours"
 local inflation = "ours"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local omitSelfEmployed = "True"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local years = "2011,2012"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local years = "2011,2012,2013,2014"
 
 // Mikey's numbers
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 local weights = "True"
 
-do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 
 
@@ -475,10 +486,11 @@ local heads_of_household_only = "False" // "False" or "True"
 local restrict_to_employed = "False" // "False" or "True"
 local use_primary_for_education = "False" // "False" or "True"
 local data_source = "FullFour" // "FullFour" or "HarvardLibrary"
+local wage_var = "lhwage" // "lwage" or "lhwage"
 
 
 forvalues years = 2011/2014 {
-	do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
+	do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 
 }
 
@@ -491,8 +503,7 @@ local omitSelfEmployed = "True" // "False" or "True"
 
 
 forvalues years = 2011/2014 {
-	qui do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source'
-
+	qui do_analysis `education' `regencies' `inflation' `omitSelfEmployed' `years' `survey_year_FEs' `weights' `regency_vars' `specification' `heads_of_household_only' `restrict_to_employed' `use_primary_for_education' `data_source' `wage_var'
 }
 
 

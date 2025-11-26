@@ -126,10 +126,7 @@ if "`regency_vars'" == "Hsiao" {
 	gen en71new = en71
 }
 
-rename B5R28B hours_per_week
-
-gen lwage = ln(B5R29 / (4 * hours_per_week))
-
+gen lwage = ln(B5R29)
 
 
 
