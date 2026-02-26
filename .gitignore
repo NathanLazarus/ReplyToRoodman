@@ -5,3 +5,4 @@ RawData/*/*
 !.gitkeep
 CleanData/*
 !CleanData/.gitkeep
+.DS_Store
